@@ -1,0 +1,62 @@
+import torch
+import numpy as np
+from src.model_head_old import Mask2FormerLiteHead
+from src.model_backbone import DinoBackbone
+from src.utils import resize_transform, image_to_tensor, tensor_to_image, outputs_to_maps, visualize_maps
+import config.config as cfg
+import cv2
+import sys
+import time
+
+COCO_ROOT = cfg.COCO_ROOT
+IMG_SIZE = cfg.IMG_SIZE
+PATCH_SIZE = cfg.PATCH_SIZE
+IMG_MEAN = np.array(cfg.IMG_MEAN, dtype=np.float32)[:, None, None]
+IMG_STD = np.array(cfg.IMG_STD, dtype=np.float32)[:, None, None]
+HIDDEN_DIM = cfg.HIDDEN_DIM
+TARGET_SIZE = cfg.TARGET_SIZE
+DINOV3_DIR = cfg.DINOV3_DIR
+DINO_MODEL = cfg.DINO_MODEL
+DINO_WEIGHTS = cfg.DINO_WEIGHTS
+MODEL_TO_NUM_LAYERS = cfg.MODEL_TO_NUM_LAYERS
+MODEL_TO_EMBED_DIM = cfg.MODEL_TO_EMBED_DIM
+MODEL_PATH_INFERENCE = cfg.MODEL_PATH_INFERENCE
+IMG_INFERENCE_PATH = cfg.IMG_INFERENCE_PATH
+CLASS_NAMES = cfg.CLASS_NAMES
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+n_layers_dino = MODEL_TO_NUM_LAYERS[DINO_MODEL]
+dino_model = torch.hub.load(
+        repo_or_dir=DINOV3_DIR,
+        model=DINO_MODEL,
+        source="local",
+        weights=DINO_WEIGHTS
+)
+dino_backbone = DinoBackbone(dino_model, n_layers_dino).to(device)
+
+embed_dim = MODEL_TO_EMBED_DIM[DINO_MODEL]
+model_head = Mask2FormerLiteHead(in_channels = embed_dim,
+                                 num_classes = len(CLASS_NAMES),
+                                 hidden_dim=HIDDEN_DIM,
+                                 target_size=(TARGET_SIZE, TARGET_SIZE)).to(device)
+model_head.load_state_dict(torch.load(MODEL_PATH_INFERENCE))
+
+image = cv2.imread(IMG_INFERENCE_PATH)
+image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+image = resize_transform(image, IMG_SIZE, PATCH_SIZE)
+image_tensor = image_to_tensor(image, IMG_MEAN, IMG_STD).unsqueeze(0).to(device)
+
+# Inference
+dino_backbone.eval()
+model_head.eval()
+
+with torch.no_grad():
+    feat = dino_backbone(image_tensor)
+    semantic_logits = model_head(feat)
+
+semantic_map = outputs_to_maps(semantic_logits, (IMG_SIZE, IMG_SIZE))
+visualize_maps(image, semantic_map, class_names=CLASS_NAMES,
+                alpha=0.6, figsize=(12, 8), draw_semantic_labels=True, semantic_label_fontsize=10,
+                background_index=0)
