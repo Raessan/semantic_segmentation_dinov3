@@ -1,6 +1,8 @@
 import torch
+from torch import nn
 import numpy as np
-from src.model_head_old import Mask2FormerLiteHead
+from src.model_head_light import Mask2FormerLiteHead
+from src.model_head import ASPPDecoder
 from src.model_backbone import DinoBackbone
 from src.utils import resize_transform, image_to_tensor, tensor_to_image, outputs_to_maps, visualize_maps
 import config.config as cfg
@@ -36,10 +38,15 @@ dino_model = torch.hub.load(
 dino_backbone = DinoBackbone(dino_model, n_layers_dino).to(device)
 
 embed_dim = MODEL_TO_EMBED_DIM[DINO_MODEL]
-model_head = Mask2FormerLiteHead(in_channels = embed_dim,
+# model_head = Mask2FormerLiteHead(in_ch = embed_dim,
+#                                  num_classes = len(CLASS_NAMES),
+#                                  hidden_dim=HIDDEN_DIM,
+#                                  target_size=(TARGET_SIZE, TARGET_SIZE)).to(device)
+
+model_head = ASPPDecoder(in_ch = embed_dim,
                                  num_classes = len(CLASS_NAMES),
-                                 hidden_dim=HIDDEN_DIM,
                                  target_size=(TARGET_SIZE, TARGET_SIZE)).to(device)
+
 model_head.load_state_dict(torch.load(MODEL_PATH_INFERENCE))
 
 image = cv2.imread(IMG_INFERENCE_PATH)
@@ -54,7 +61,12 @@ model_head.eval()
 
 with torch.no_grad():
     feat = dino_backbone(image_tensor)
-    semantic_logits = model_head(feat)
+    init = time.time()
+    n_inference = 1000
+    for i in range(n_inference):
+        semantic_logits = model_head(feat)
+    end = time.time()
+    print("time per sample: ", (end-init)*1000/n_inference)
 
 semantic_map = outputs_to_maps(semantic_logits, (IMG_SIZE, IMG_SIZE))
 visualize_maps(image, semantic_map, class_names=CLASS_NAMES,

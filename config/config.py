@@ -47,7 +47,7 @@ MODEL_PATH_TRAIN_LOAD = '/home/rafa/deep_learning/projects/segmentation_dinov3/r
 RESULTS_PATH = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results' # Folder where the result will be saved
 
 # PARAMETERS FOR INFERENCE
-MODEL_PATH_INFERENCE = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results/2025-09-07_23-56-46/model_13.pth' # Path of the model to perform inference
+MODEL_PATH_INFERENCE = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results/2025-09-08_21-50-18/model_13.pth' # Path of the model to perform inference
 IMG_INFERENCE_PATH = '/home/rafa/deep_learning/datasets/COCO/val2017/000000000139.jpg'
 
 CLASS_NAMES = ['background', 'person', 'bicycle', 'car', 'motorcycle', 

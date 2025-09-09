@@ -23,7 +23,7 @@ class DepthwiseSeparable(nn.Module):
         x = self.bn(x)
         return self.act(x)
 
-class LightweightASPPDecoder(nn.Module):
+class ASPPDecoder(nn.Module):
     def __init__(self, num_classes, in_ch=384, proj_ch=576, branch_ch=288, target_size=(640, 640)):
         """
         num_classes: NC
@@ -107,10 +107,7 @@ if __name__ == '__main__':
 
     C = feat.shape[1]
 
-    segmentation_head = ConvDecoder(in_ch=C,
-                                    num_classes=134,
-                                    hidden_ch=256,
-                                    out_size=(img_size, img_size)).to(device)
+    segmentation_head = ASPPDecoder(num_classes=134, in_ch=C, target_size=(320, 320)).to(device)
     
     # ----------------- Utility: parameter counting -----------------
     def count_parameters(module: nn.Module) -> int:

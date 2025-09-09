@@ -1,4 +1,3 @@
-import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,19 +5,19 @@ import torch.nn.functional as F
 
 class Mask2FormerLiteHead(nn.Module):
     def __init__(self,
-                 in_channels=384,
+                 in_ch=384,
                  num_classes=134,   # things + stuff + background (semantic head)
                  hidden_dim=256,
                  target_size=(640, 640)):
         super().__init__()
-        self.in_channels = in_channels
+        self.in_channels = in_ch
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
         self.target_size = target_size
 
         # 1) Pixel embedding: project backbone -> hidden_dim
         self.pixel_embed = nn.Sequential(
-            nn.Conv2d(in_channels, hidden_dim, kernel_size=1),
+            nn.Conv2d(in_ch, hidden_dim, kernel_size=1),
             nn.BatchNorm2d(hidden_dim),
             nn.ReLU(inplace=True),
             # small separable conv to increase receptive field cheaply
@@ -76,7 +75,7 @@ if __name__ == '__main__':
     from model_backbone import DinoBackbone
     device = "cuda" if torch.cuda.is_available() else "cpu"
     img_size = 640
-    image = torch.randn(4,3,img_size,img_size).to(device)
+    image = torch.randn(1,3,img_size,img_size).to(device)
     dinov3_dir = '/home/rafa/deep_learning/projects/segmentation_dinov3/dinov3'
     dinov3_weights_path = '/home/rafa/deep_learning/projects/segmentation_dinov3/results/dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth'
     dino_model = torch.hub.load(
@@ -92,10 +91,11 @@ if __name__ == '__main__':
 
     C = feat.shape[1]
 
-    segmentation_head = ConvDecoder(in_ch=C,
-                                    num_classes=134,
-                                    hidden_ch=256,
-                                    out_size=(img_size, img_size)).to(device)
+    segmentation_head = Mask2FormerLiteHead(in_ch=C,
+                                            num_classes=134,   # things + stuff + background (semantic head)
+                                            hidden_dim=256,
+                                            target_size=(320, 320)).to(device)
+    
     
     # ----------------- Utility: parameter counting -----------------
     def count_parameters(module: nn.Module) -> int:
