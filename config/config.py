@@ -43,13 +43,14 @@ NUM_SAMPLES_PLOT = 6 # Number of samples to plot during training or validation
 
 LOAD_MODEL = False # Whether to load an existing model for training
 SAVE_MODEL = True # Whether to save the result from the training
-MODEL_PATH_TRAIN_LOAD = '/home/rafa/deep_learning/projects/segmentation_dinov3/results/2025-09-07_02-36-38/model_4.pth' # Path of the model to load
+MODEL_PATH_TRAIN_LOAD = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results/2025-09-08_21-50-18/2025-09-09_23-19-30/model_3.pth' # Path of the model to load
 RESULTS_PATH = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results' # Folder where the result will be saved
 
 # PARAMETERS FOR INFERENCE
 MODEL_PATH_INFERENCE = '/home/rafa/deep_learning/projects/semantic_segmentation_dinov3/results/2025-09-08_21-50-18/model_13.pth' # Path of the model to perform inference
 IMG_INFERENCE_PATH = '/home/rafa/deep_learning/datasets/COCO/val2017/000000000139.jpg'
 
+# Classes obtained from the dataset_coco.py
 CLASS_NAMES = ['background', 'person', 'bicycle', 'car', 'motorcycle', 
                'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 
                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 

@@ -1,10 +1,10 @@
 import torch
 from torch import nn
 import numpy as np
-from src.model_head_light import Mask2FormerLiteHead
 from src.model_head import ASPPDecoder
 from src.model_backbone import DinoBackbone
-from src.utils import resize_transform, image_to_tensor, tensor_to_image, outputs_to_maps, visualize_maps
+from src.common import image_to_tensor
+from src.utils import outputs_to_maps, visualize_maps
 import config.config as cfg
 import cv2
 import sys
@@ -38,10 +38,6 @@ dino_model = torch.hub.load(
 dino_backbone = DinoBackbone(dino_model, n_layers_dino).to(device)
 
 embed_dim = MODEL_TO_EMBED_DIM[DINO_MODEL]
-# model_head = Mask2FormerLiteHead(in_ch = embed_dim,
-#                                  num_classes = len(CLASS_NAMES),
-#                                  hidden_dim=HIDDEN_DIM,
-#                                  target_size=(TARGET_SIZE, TARGET_SIZE)).to(device)
 
 model_head = ASPPDecoder(in_ch = embed_dim,
                                  num_classes = len(CLASS_NAMES),
@@ -52,7 +48,8 @@ model_head.load_state_dict(torch.load(MODEL_PATH_INFERENCE))
 image = cv2.imread(IMG_INFERENCE_PATH)
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-image = resize_transform(image, IMG_SIZE, PATCH_SIZE)
+# Resize image
+image = cv2.resize(image, (IMG_SIZE, IMG_SIZE), interpolation=cv2.INTER_LINEAR)
 image_tensor = image_to_tensor(image, IMG_MEAN, IMG_STD).unsqueeze(0).to(device)
 
 # Inference

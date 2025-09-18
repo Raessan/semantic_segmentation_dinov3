@@ -76,3 +76,35 @@ class SemanticLoss(nn.Module):
                                reduction='mean')
         d = multiclass_dice_loss(logits, targets_resized, reduction='mean')
         return self.focal_weight * f + self.dice_weight * d, self.focal_weight*f, self.dice_weight*d
+    
+if __name__ == "__main__":
+    torch.manual_seed(0)
+
+    # --- toy shapes and params ---
+    B, C = 2, 134                      # batch size and num classes
+    H_lab, W_lab = 640, 640        
+    target_hw = (320, 320)           
+
+    # Fake model logits at 320x320 (match target_size expected by the loss)
+    logits = torch.randn(B, C, target_hw[0], target_hw[1], requires_grad=True)
+
+    # Fake integer targets (class ids in [0, C-1]) at a different size
+    targets = torch.randint(0, C, (B, H_lab, W_lab), dtype=torch.long)
+
+    # Instantiate the criterion
+    criterion = SemanticLoss(
+        dice_weight=1.0,
+        focal_weight=1.0,
+        focal_gamma=2.0,
+        focal_alpha=0.25,
+        target_size=target_hw      
+    )
+
+    # Compute losses
+    total_loss, focal_loss_val, dice_loss_val = criterion(logits, targets)
+
+    print(
+        f"total: {total_loss.item():.4f} | "
+        f"focal: {focal_loss_val.item():.4f} | "
+        f"dice: {dice_loss_val.item():.4f}"
+    )

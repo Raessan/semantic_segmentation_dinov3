@@ -1,23 +1,15 @@
 from torch.utils.data import Dataset
-from pycocotools.coco import COCO
 import cv2
 import numpy as np
 import random
 import os
-from src.utils import image_to_tensor, resize_transform, tensor_to_image
+from src.common import image_to_tensor, tensor_to_image
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
-import os
 import json
-import random
-import cv2
-import numpy as np
 import torch
-from torch.utils.data import Dataset
-from pycocotools.coco import COCO
-from src.utils import image_to_tensor, resize_transform, tensor_to_image
-import matplotlib.pyplot as plt
+import albumentations as A
 
 class DatasetCOCOPanoptic(Dataset):
     """
@@ -74,9 +66,6 @@ class DatasetCOCOPanoptic(Dataset):
         self.thing_names.insert(0,'background')
         print("Thing names ({}):".format(len(self.thing_names)), self.thing_names[:10], "…")
 
-        # COCO instance API (optional)
-        # self.coco_instances = COCO(os.path.join(self.root_dir,"annotations","instances_{}2017.json".format(self.mode)))
-
         self.augment_prob = augment_prob
         self.mean = np.array(mean, dtype=np.float32)[:, None, None]
         self.std = np.array(std, dtype=np.float32)[:, None, None]
@@ -84,6 +73,44 @@ class DatasetCOCOPanoptic(Dataset):
         # list of image info entries from panoptic JSON (to preserve order)
         self.images = {img['id']: img for img in self.panoptic_json['images']}
         self.ids = list(sorted(self.images.keys()))
+
+        self.transform = A.Compose([
+            # --- Geometric (apply to both image & depth) ---
+            A.HorizontalFlip(p=0.5),
+
+            # a bit more aggressive crop/ratio
+            A.RandomResizedCrop(size=(480, 640),
+                                scale=(0.8, 1.0),
+                                ratio=(0.95, 1.05),
+                                p=0.6),
+
+            # combine small shift/scale/rotate
+            A.Affine(
+                scale=(0.95, 1.05),               
+                translate_percent=(-0.02, 0.02),   
+                rotate=(-10, 10),                  
+                interpolation=cv2.INTER_LINEAR,
+                mask_interpolation=cv2.INTER_NEAREST,        
+                fill=0,                             
+                fill_mask=0,                        
+                p=0.5
+            ),
+
+            # --- Photometric (image only) ---
+            A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.5),
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=0.3),
+            A.RandomGamma(gamma_limit=(90, 110), p=0.2),
+
+            # small amount of blur/noise; OneOf keeps it moderate
+            A.OneOf([
+                A.GaussNoise(std_range=(0.05, 0.1), p=0.3),
+                A.GaussianBlur(blur_limit=(3, 5)),
+                A.MotionBlur(blur_limit=5),
+            ], p=0.3),
+        ],
+            additional_targets={'semantic': 'mask',
+                                'instance': 'mask'}
+        )
 
         random.seed(42)
 
@@ -104,37 +131,6 @@ class DatasetCOCOPanoptic(Dataset):
         b = rgb[..., 2].astype(np.int32)
         seg_id = r + (g << 8) + (b << 16)
         return seg_id
-
-    def photometric_augment(self, img,
-                            brightness_delta=32,
-                            contrast_range=(0.8,1.2),
-                            saturation_range=(0.8,1.2),
-                            hue_delta=10,
-                            p_jitter=0.5,
-                            p_blur=0.3,
-                            p_noise=0.3):
-        # reuse same augmenter code as in detection dataset
-        out = img.astype(np.float32)
-
-        if random.random() < p_jitter:
-            delta = random.uniform(-brightness_delta, brightness_delta)
-            out += delta
-        if random.random() < p_jitter:
-            alpha = random.uniform(*contrast_range)
-            out *= alpha
-        if random.random() < p_jitter:
-            hsv = cv2.cvtColor(out.clip(0,255).astype(np.uint8), cv2.COLOR_BGR2HSV).astype(np.float32)
-            hsv[...,1] *= random.uniform(*saturation_range)
-            hsv[...,0] += random.uniform(-hue_delta, hue_delta)
-            out = cv2.cvtColor(hsv.clip(0,255).astype(np.uint8), cv2.COLOR_HSV2BGR).astype(np.float32)
-        if random.random() < p_blur:
-            k = random.choice([3,5])
-            out = cv2.GaussianBlur(out, (k,k), 0)
-        if random.random() < p_noise:
-            sigma = random.uniform(5, 20)
-            noise = np.random.randn(*out.shape) * sigma
-            out += noise
-        return out.clip(0,255).astype(np.uint8)
 
     # --- Core -------------------------------------------------------------
     def __getitem__(self, idx):
@@ -187,7 +183,10 @@ class DatasetCOCOPanoptic(Dataset):
                 segid_to_instid[sid] = next_inst_id
                 next_inst_id += 1
             else:
-                segid_to_instid[sid] = 0 #Use this line instead of the rest of this "else" to prevent stuff from getting an instance
+                # With this line, we consider all the "stuff" as 0 class
+                segid_to_instid[sid] = 0 
+                
+                # With the following lines (instead of the previous one) we consider each "stuff" as a separate class, with just one instance
                 # stuff -> one id per category
                 # if label not in stuff_class_to_instid:
                 #     stuff_class_to_instid[label] = next_inst_id
@@ -212,10 +211,13 @@ class DatasetCOCOPanoptic(Dataset):
 
         # Optional augment (only photometric; geometric transforms need masks too)
         if random.random() < self.augment_prob:
-            image = self.photometric_augment(image)
+            aug = self.transform(image=image, semantic=semantic_mask, instance=instance_mask)
+            image = aug['image']
+            semantic_mask = aug['semantic']
+            instance_mask = aug['instance']
 
         # Resize image using helper, then resize masks to match
-        image_resized = resize_transform(image, self.img_size, self.patch_size)
+        image_resized = cv2.resize(image, (self.img_size, self.img_size), interpolation=cv2.INTER_LINEAR)
         # get output size
         out_h, out_w = image_resized.shape[:2]
 
@@ -228,23 +230,23 @@ class DatasetCOCOPanoptic(Dataset):
         semantic_mask_t = torch.from_numpy(semantic_mask_resized.astype(np.int64))
         instance_mask_t = torch.from_numpy(instance_mask_resized.astype(np.int32))
 
-        return image_tensor, semantic_mask_t, instance_mask_t#, segments
+        return image_tensor, semantic_mask_t, instance_mask_t
 
 if __name__ == '__main__':
     COCO_ROOT = '/home/rafa/deep_learning/datasets/COCO'
     MODE = "val"
     IMG_SIZE = 640
     PATCH_SIZE = 16
-    AUGMENT_PROB=0.0
-    dataset = DatasetCOCOPanoptic(COCO_ROOT, MODE, IMG_SIZE, PATCH_SIZE, 0.0)
+    AUGMENT_PROB=1.0
+    dataset = DatasetCOCOPanoptic(COCO_ROOT, MODE, IMG_SIZE, PATCH_SIZE, AUGMENT_PROB)
     print("Class names:\n", dataset.class_names)
     data = dataset.__getitem__(0)
     #dataset.visualize(0, 1.0)
     image, semantic_mask, _ = data # We don't use here the instance map
     print("image: ", image.shape, image.dtype)
     print("semantic_mask: ", semantic_mask.shape, semantic_mask.dtype)
-    from utils import visualize_maps, tensor_to_image
+    from utils import visualize_maps
     visualize_maps(tensor_to_image(image, dataset.mean, dataset.std),
                    semantic_mask.cpu().numpy(),
                    class_names=dataset.class_names,
-                   alpha=1.0)
+                   alpha=0.6)
