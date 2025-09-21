@@ -2,7 +2,7 @@
 
 This repository provides a lightweight object detection head designed to run on top of Meta’s [DINOv3](https://github.com/facebookresearch/dinov3) backbone. The model combines a projection layer with a lightweight ASPP-style decoder, enhanced by depthwise separable convolutions, to efficiently generate dense semantic predictions from DINOv3 features while keeping the parameter count low. It has been trained using the [COCO dataset](https://cocodataset.org/) with panoptic annotations.
 
-This head is part of the [dinov3_ros](https://github.com/Raessan/dinov3_ros) project, where it enables real-time object detection in ROS 2 by reusing backbone features across multiple perception tasks.
+This head is part of the [dinov3_ros](https://github.com/Raessan/dinov3_ros) project, where it enables real-time semantic segmentation in ROS 2 by reusing backbone features across multiple perception tasks.
 
 
 ## Table of Contents
