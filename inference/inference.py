@@ -24,7 +24,11 @@ MODEL_TO_NUM_LAYERS = cfg.MODEL_TO_NUM_LAYERS
 MODEL_TO_EMBED_DIM = cfg.MODEL_TO_EMBED_DIM
 MODEL_PATH_INFERENCE = cfg.MODEL_PATH_INFERENCE
 IMG_INFERENCE_PATH = cfg.IMG_INFERENCE_PATH
-CLASS_NAMES = cfg.CLASS_NAMES
+CLASS_NAMES_PATH = cfg.CLASS_NAMES_PATH
+
+# Get class names from COCO
+with open(CLASS_NAMES_PATH) as f:
+    class_names = [line.strip() for line in f]
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -40,7 +44,7 @@ dino_backbone = DinoBackbone(dino_model, n_layers_dino).to(device)
 embed_dim = MODEL_TO_EMBED_DIM[DINO_MODEL]
 
 model_head = ASPPDecoder(in_ch = embed_dim,
-                                 num_classes = len(CLASS_NAMES),
+                                 num_classes = len(class_names),
                                  target_size=(TARGET_SIZE, TARGET_SIZE)).to(device)
 
 model_head.load_state_dict(torch.load(MODEL_PATH_INFERENCE))
@@ -66,6 +70,6 @@ with torch.no_grad():
     print("time per sample: ", (end-init)*1000/n_inference)
 
 semantic_map = outputs_to_maps(semantic_logits, (IMG_SIZE, IMG_SIZE))
-visualize_maps(image, semantic_map, class_names=CLASS_NAMES,
+visualize_maps(image, semantic_map, class_names=class_names,
                 alpha=0.6, figsize=(12, 8), draw_semantic_labels=True, semantic_label_fontsize=10,
                 background_index=0)

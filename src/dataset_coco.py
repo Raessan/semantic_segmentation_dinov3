@@ -240,6 +240,9 @@ if __name__ == '__main__':
     AUGMENT_PROB=1.0
     dataset = DatasetCOCOPanoptic(COCO_ROOT, MODE, IMG_SIZE, PATCH_SIZE, AUGMENT_PROB)
     print("Class names:\n", dataset.class_names)
+    # Save class names
+    with open("src/class_names.txt", "w") as f:
+        f.write("\n".join(dataset.class_names))
     data = dataset.__getitem__(0)
     #dataset.visualize(0, 1.0)
     image, semantic_mask, _ = data # We don't use here the instance map
