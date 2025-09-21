@@ -1,4 +1,4 @@
-# semantic_segmentation_dinov3: Lightweight head for semantic segmentation using DINOv3 as backbone
+# Lightweight head for semantic segmentation using DINOv3 as backbone
 
 This repository provides a lightweight object detection head designed to run on top of Meta’s [DINOv3](https://github.com/facebookresearch/dinov3) backbone. The model combines a projection layer with a lightweight ASPP-style decoder, enhanced by depthwise separable convolutions, to efficiently generate dense semantic predictions from DINOv3 features while keeping the parameter count low. It has been trained using the [COCO dataset](https://cocodataset.org/) with panoptic annotations.
 
