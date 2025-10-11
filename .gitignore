@@ -9,4 +9,4 @@ build/
 *.egg-info/
 
 test_data/
-dino_weights/
+dinov3_weights/
